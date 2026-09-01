@@ -70,6 +70,7 @@ function newChat(): void {
   createSession();
   const area = $('chat-area');
   if (area) {
+    // keep welcome for empty
     const welcome = area.querySelector('.welcome');
     area.innerHTML = '';
     if (welcome) area.appendChild(welcome);
@@ -107,6 +108,7 @@ async function sendMessage(): Promise<void> {
   input.value = '';
   input.style.height = 'auto';
 
+  // User bubble
   const area = $('chat-area');
   if (area) {
     const welcome = area.querySelector('.welcome');
@@ -119,9 +121,11 @@ async function sendMessage(): Promise<void> {
     area.scrollTop = area.scrollHeight;
   }
 
+  // Typing indicator
   showTyping();
 
   try {
+    // TODO: call real API_BASE /chat
     await new Promise((r) => setTimeout(r, 800));
     hideTyping();
     addBotMessage(
@@ -185,6 +189,7 @@ function boot(): void {
   updateOfflineBanner();
   bindGlobals();
 
+  // Events
   on($('menuBtn'), 'click', openSidebar);
   on($('sidebarClose'), 'click', closeSidebar);
   on($('overlay'), 'click', closeSidebar);
@@ -213,8 +218,10 @@ function boot(): void {
     showToast('Back online ✓');
   });
 
+  // Splash
   setTimeout(dismissSplash, 1400);
 
+  // Preferred name greeting
   const name = localStorage.getItem('skonga_preferred_name');
   const greet = $('welcomeGreeting');
   if (greet) {
