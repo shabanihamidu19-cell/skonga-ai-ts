@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SKONGA Pay</title>
+  <style>
+    :root { --bg:#0B0E13; --card:#1A2230; --border:#232E3E; --accent:#00E07A; --text:#E8EDF4; --muted:#64748B; --warn:#F59E0B; --danger:#EF4444; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:system-ui,sans-serif; padding:20px; }
+    .wrap { max-width:480px; margin:0 auto; }
+    a { color:var(--accent); }
+    h1 { font-size:1.4rem; margin:16px 0 8px; }
+    p { color:var(--muted); font-size:14px; margin-bottom:16px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px; margin-bottom:14px; }
+    label { display:block; font-size:13px; color:var(--muted); margin:10px 0 6px; }
+    input, select { width:100%; background:#131820; border:1.5px solid var(--border); border-radius:8px; color:var(--text); padding:12px; font-size:15px; }
+    button { width:100%; margin-top:14px; padding:14px; border:0; border-radius:8px; background:var(--accent); color:#050A05; font-weight:700; cursor:pointer; }
+    button:disabled { opacity:.4; }
+    .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--warn); margin-right:6px; }
+    .dot.ok { background:var(--accent); }
+    .msg { margin-top:12px; font-size:13px; color:var(--muted); white-space:pre-wrap; }
+    .ok { color:var(--accent); } .err { color:var(--danger); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a href="./index.html">← Rudi app</a>
+    <h1>SKONGA Pay · ClickPesa</h1>
+    <p><span class="dot" id="dot"></span><span id="conn">Inakagua backend…</span></p>
+    <div class="card">
+      <label>Kifurushi</label>
+      <select id="plan">
+        <option value="day">1 Day — TSh 620</option>
+        <option value="week">1 Week — TSh 3,500</option>
+        <option value="month" selected>1 Month — TSh 5,000</option>
+        <option value="year">1 Year — TSh 45,000</option>
+      </select>
+      <label>Nambari ya simu</label>
+      <input id="phone" type="tel" placeholder="0742 000 000" />
+      <button id="payBtn" onclick="pay()">Tuma USSD Push</button>
+      <div class="msg" id="out"></div>
+    </div>
+    <div class="card">
+      <label>Angalia order ID</label>
+      <input id="ref" placeholder="skp_…" />
+      <button onclick="check()">Angalia hali</button>
+      <div class="msg" id="out2"></div>
+    </div>
+  </div>
+<script>
+const API = 'https://skonga-backend-v2.onrender.com';
+function norm(p){
+  p = String(p||'').replace(/\s+/g,'').replace(/^\+/,'');
+  if(p.startsWith('0')) p = '255'+p.slice(1);
+  if(!p.startsWith('255') && /^[67]\d{8}$/.test(p)) p = '255'+p;
+  return p;
+}
+async function health(){
+  try{
+    const r = await fetch(API+'/health');
+    const j = await r.json();
+    document.getElementById('dot').className = 'dot ok';
+    document.getElementById('conn').textContent =
+      'Live · '+API+' · provider='+(j.payments&&j.payments.provider)+' clickpesa='+(j.payments&&j.payments.clickpesa);
+  }catch(e){
+    document.getElementById('conn').textContent = 'Backend haipatikani';
+  }
+}
+async function pay(){
+  const out = document.getElementById('out');
+  const btn = document.getElementById('payBtn');
+  const phone = norm(document.getElementById('phone').value);
+  const planId = document.getElementById('plan').value;
+  if(!/^255[67]\d{8}$/.test(phone)){ out.className='msg err'; out.textContent='Nambari si sahihi'; return; }
+  btn.disabled = true; out.className='msg'; out.textContent='Inatuma…';
+  try{
+    const r = await fetch(API+'/api/payments/initiate', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Skonga-Platform':'web'},
+      body: JSON.stringify({ planId, phone, sessionId: 'payhtml-'+Date.now() })
+    });
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error||j.message||('HTTP '+r.status));
+    out.className='msg ok';
+    out.textContent = (j.message||'STK imetumwa') + '\nRef: ' + (j.order&&j.order.orderId);
+    if(j.order&&j.order.orderId) document.getElementById('ref').value = j.order.orderId;
+  }catch(e){ out.className='msg err'; out.textContent=e.message; }
+  finally{ btn.disabled=false; }
+}
+async function check(){
+  const ref = document.getElementById('ref').value.trim();
+  const out = document.getElementById('out2');
+  if(!ref){ out.textContent='Weka order ID'; return; }
+  try{
+    const r = await fetch(API+'/api/payments/status/'+encodeURIComponent(ref));
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error||('HTTP '+r.status));
+    out.className='msg ok';
+    out.textContent = JSON.stringify(j,null,2);
+  }catch(e){ out.className='msg err'; out.textContent=e.message; }
+}
+health();
+</script>
+</body>
+</html>
